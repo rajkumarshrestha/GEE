@@ -1,24 +1,10 @@
 # GEE
 Google Earth Engine Practice Code
 
-Here’s a sample `README.md` file in Markdown format for your GitHub repository, detailing the Earth Engine code and its functionality:
-
 ```markdown
-# Land Use Land Cover (LULC) Classification using Google Earth Engine (GEE)
+# LULC Classification using GEE and SVM.
 
-This repository contains Google Earth Engine (GEE) code to classify Land Use and Land Cover (LULC) using Landsat 8 satellite imagery. The code applies a Support Vector Machine (SVM) classifier to classify four land cover types: water, settlement, vegetation, and agriculture. It uses specific training data points for each class and evaluates the classification accuracy using a confusion matrix and Kappa coefficient.
-
-## Table of Contents
-- [Description](#description)
-- [Requirements](#requirements)
-- [Data Sources](#data-sources)
-- [Code Overview](#code-overview)
-- [Output](#output)
-- [Usage](#usage)
-- [Contributing](#contributing)
-- [License](#license)
-
----
+This repository contains Google Earth Engine (GEE) code to classify Land Use and Land Cover (LULC) using Landsat 8 satellite imagery. The code applies a Support Vector Machine (SVM) classifier to classify four land cover types: water, settlement, vegetation, barrenland and agriculture. It uses specific training data points for each class and evaluates the classification accuracy using a confusion matrix and Kappa coefficient.
 
 ## Description
 
