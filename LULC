@@ -1,0 +1,88 @@
+// Define the region of interest (ROI) and add it to the map
+//var roi = 
+Map.addLayer(roi, {}, 'Region of Interest');
+
+// Load the Landsat 8 ImageCollection and filter it based on date, location, and cloud cover
+var l8_composite = ee.ImageCollection("LANDSAT/LC08/C02/T1_RT_TOA")
+                    .filterDate('2024-04-01', '2024-05-30') // Filter for images from April to May 2024
+                    .filterBounds(roi) // Filter for images that cover the ROI
+                    .filter(ee.Filter.lt('CLOUD_COVER', 2)) // Keep images with less than 2% cloud cover
+                    .median() // Compute the median pixel values across images
+                    .clip(roi); // Clip the composite to the ROI
+
+// Visualization parameters for the Landsat 8 composite layer
+var vis_params = {
+  bands: ['B5', 'B4', 'B3'], // Use Near-Infrared (B5), Red (B4), and Green (B3) bands
+  min: 0,
+  max: 3000,
+  gamma: 1.2 // Adjust gamma for visualization
+};
+
+// Add the composite image to the map with the specified visualization parameters
+Map.addLayer(l8_composite, vis_params, 'Landsat 8 Composite');
+
+// Merge the training points for each land cover class (e.g., water, settlement, vegetation, agriculture)
+var trainingPoint = Water.merge(Settlement).merge(Vegetation).merge(Agriculture).merge(Barrenland);
+
+// Buffer each training point by 30 meters to create training samples
+var trainingSample = trainingPoint.map(function(point) {
+  return point.buffer(30);
+});
+
+// Define the label property for the classes and select the bands for classification
+var label = 'class'; // Property used to label each land cover class
+var bands = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11']; // Selected Landsat 8 bands
+
+// Select the specified bands from the composite image for classification input
+var input = l8_composite.select(bands);
+
+// Sample training regions from the image using the buffered training samples
+var trainImage = input.sampleRegions({
+  collection: trainingSample, // Use the training samples as the collection
+  properties: [label], // Include the class property for each sample
+  scale: 30 // Sample at 30-meter resolution
+});
+
+// Split the training data into training and testing datasets
+var trainingData = trainImage.randomColumn(); // Add a random column for splitting
+var trainSet = trainingData.filter(ee.Filter.lessThan('random', 0.8)); // 80% of data for training
+var testSet = trainingData.filter(ee.Filter.greaterThanOrEquals('random', 0.8)); // 20% of data for testing
+
+// Train an SVM (Support Vector Machine) classifier using the training dataset
+var classifier = ee.Classifier.libsvm().train({
+  features: trainSet, // Training data
+  classProperty: label, // The property that contains class labels
+  inputProperties: bands // Bands used for classification
+});
+
+// Evaluate the classifier by creating a confusion matrix with the test dataset
+var confusionMatrix = ee.ConfusionMatrix(testSet.classify(classifier).errorMatrix({
+  actual: label, // Actual class labels
+  predicted: 'classification' // Predicted class labels from classification
+}));
+print('Confusion Matrix', confusionMatrix); // Print the confusion matrix to the console
+print('Overall Accuracy', confusionMatrix.accuracy()); // Print the overall accuracy of the classifier
+
+// Calculate and print the Kappa coefficient for validation
+var kappa = confusionMatrix.kappa();
+print('Kappa', kappa);
+
+// Classify the composite image using the trained classifier
+var classified = input.classify(classifier);
+
+// Display the classified image on the map with custom color palette for each land cover class
+Map.addLayer(classified, {
+  palette: ['blue', 'yellow', 'green', 'red', 'brown'], // Colors for each class
+  min: 1,
+  max: 5
+}, 'Land Cover Classification', true, 0.5); // Set opacity to 0.5
+
+// Export the classified image to Google Drive
+Export.image.toDrive({
+  image: classified, // Image to export (classified land cover)
+  description: 'LULC', // Name for the exported image file
+  folder: 'GEE', // Google Drive folder to save the file in
+  scale: 30, // Pixel resolution in meters
+  region: roi, // Region of interest to export
+  maxPixels: 1e13 // Maximum number of pixels to avoid export errors for large images
+});
